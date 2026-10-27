@@ -1,0 +1,42 @@
+name: link-audit
+
+on:
+  schedule:
+    # Monthly: 1st day at 03:00 UTC
+    - cron: '0 3 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: link-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run monthly link audit
+        shell: pwsh
+        run: ./scripts/05_monthly_link_audit.ps1 -LinksFile links.txt -OutCsv status.csv
+
+      - name: Verify row count
+        shell: pwsh
+        run: |
+          $d = Import-Csv status.csv
+          "ROWS=$($d.Count)"
+          if ($d.Count -ne 87) { throw "Expected 87 rows, got $($d.Count)" }
+
+      - name: Upload status.csv
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: link-audit-status
+          path: status.csv
+          if-no-files-found: warn
+          retention-days: 90
